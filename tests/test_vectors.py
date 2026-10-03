@@ -150,6 +150,14 @@ def test_vector(path, vector):
             _unhex_all(inp["messageHexes"]),
         )
         assert verified is expected["signatureVerifies"]
+        # BBS signing is deterministic (draft-irtf-cfrg-bbs-signatures §3.5.1),
+        # so the issuer path must reproduce the published signature byte for byte.
+        signed = bbs.sign(
+            bytes.fromhex(inp["secretKeyHex"]),
+            bytes.fromhex(inp["headerHex"]),
+            _unhex_all(inp["messageHexes"]),
+        )
+        assert signed == inp["signatureHex"]
 
     elif category in ("bbs-selective-disclosure", "bbs-selective-disclosure-negative"):
         # The negative vector discloses messages the signature never covered.

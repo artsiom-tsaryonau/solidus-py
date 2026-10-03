@@ -52,6 +52,7 @@ fn bbs_public_key_hex(secret_key: [u8; 32]) -> PyResult<String> {
 /// "this credential is invalid" from "you passed me garbage".
 #[pyfunction]
 fn bbs_verify(
+    py: Python<'_>,
     signature_hex: &str,
     public_key_hex: &str,
     header: Vec<u8>,
@@ -59,7 +60,7 @@ fn bbs_verify(
 ) -> PyResult<bool> {
     let pk = BbsPublicKey::from_hex(public_key_hex).map_err(value_err)?;
     let sig = BbsSignature::from_hex(signature_hex).map_err(value_err)?;
-    Ok(sig.is_valid(&pk, &header, &as_refs(&messages)))
+    Ok(py.detach(|| sig.is_valid(&pk, &header, &as_refs(&messages))))
 }
 
 /// Holder side: produce a selective-disclosure proof, as lowercase hex.
@@ -69,6 +70,7 @@ fn bbs_verify(
 /// a reordered index set verifies against the wrong claims.
 #[pyfunction]
 fn bbs_create_proof(
+    py: Python<'_>,
     signature_hex: &str,
     public_key_hex: &str,
     header: Vec<u8>,
@@ -78,14 +80,16 @@ fn bbs_create_proof(
 ) -> PyResult<String> {
     let pk = BbsPublicKey::from_hex(public_key_hex).map_err(value_err)?;
     let sig = BbsSignature::from_hex(signature_hex).map_err(value_err)?;
-    let proof = sig
-        .create_proof(
-            &pk,
-            &header,
-            &presentation_header,
-            &as_refs(&messages),
-            &disclosed_indices,
-        )
+    let proof = py
+        .detach(|| {
+            sig.create_proof(
+                &pk,
+                &header,
+                &presentation_header,
+                &as_refs(&messages),
+                &disclosed_indices,
+            )
+        })
         .map_err(value_err)?;
     Ok(proof.to_hex())
 }
@@ -97,6 +101,7 @@ fn bbs_create_proof(
 /// key, and the (index, message) pairs being asserted.
 #[pyfunction]
 fn bbs_verify_proof(
+    py: Python<'_>,
     proof_hex: &str,
     public_key_hex: &str,
     header: Vec<u8>,
@@ -106,18 +111,48 @@ fn bbs_verify_proof(
 ) -> PyResult<bool> {
     let pk = BbsPublicKey::from_hex(public_key_hex).map_err(value_err)?;
     let proof = BbsProof::from_hex(proof_hex).map_err(value_err)?;
-    Ok(proof.is_valid(
-        &pk,
-        &header,
-        &presentation_header,
-        &disclosed_indices,
-        &as_refs(&disclosed_messages),
-    ))
+    Ok(py.detach(|| {
+        proof.is_valid(
+            &pk,
+            &header,
+            &presentation_header,
+            &disclosed_indices,
+            &as_refs(&disclosed_messages),
+        )
+    }))
+}
+
+/// Issuer side: a fresh random BBS+ secret key, as 32 bytes.
+///
+/// Generated in Rust rather than from `os.urandom(32)`: not every 32-byte string
+/// is a valid scalar, and KeyGen is where implementations disagree (see
+/// `bbs_public_key_hex`). Store the bytes; never re-derive them from IKM.
+#[pyfunction]
+fn bbs_generate_secret_key() -> PyResult<Vec<u8>> {
+    let sk = BbsSecretKey::generate().map_err(value_err)?;
+    Ok(sk.to_bytes().to_vec())
+}
+
+/// Issuer side: sign the full message vector under a header, as lowercase hex.
+#[pyfunction]
+fn bbs_sign(
+    py: Python<'_>,
+    secret_key: [u8; 32],
+    header: Vec<u8>,
+    messages: Vec<Vec<u8>>,
+) -> PyResult<String> {
+    let sk = BbsSecretKey::from_bytes(&secret_key).map_err(value_err)?;
+    let sig = py
+        .detach(|| sk.sign(&header, &as_refs(&messages)))
+        .map_err(value_err)?;
+    Ok(sig.to_hex())
 }
 
 #[pymodule]
 fn solidus_network_native(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(bbs_public_key_hex, m)?)?;
+    m.add_function(wrap_pyfunction!(bbs_generate_secret_key, m)?)?;
+    m.add_function(wrap_pyfunction!(bbs_sign, m)?)?;
     m.add_function(wrap_pyfunction!(bbs_verify, m)?)?;
     m.add_function(wrap_pyfunction!(bbs_create_proof, m)?)?;
     m.add_function(wrap_pyfunction!(bbs_verify_proof, m)?)?;

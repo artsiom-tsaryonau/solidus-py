@@ -1,6 +1,6 @@
 """Type stubs for the Rust extension module.
 
-The four functions below are `#[pyfunction]`s in `src/lib.rs`. They are the
+The six functions below are `#[pyfunction]`s in `src/lib.rs`. They are the
 whole native surface: everything else in this package is Python.
 
 ⚠ This file is what makes the `Typing :: Typed` classifier true. Without it,
@@ -17,6 +17,8 @@ Byte sequences are `bytes` on the Python side; the Rust signatures spell them
 from typing import Sequence
 
 def bbs_public_key_hex(secret_key: bytes) -> str: ...
+def bbs_generate_secret_key() -> bytes: ...
+def bbs_sign(secret_key: bytes, header: bytes, messages: Sequence[bytes]) -> str: ...
 def bbs_verify(
     signature_hex: str,
     public_key_hex: str,

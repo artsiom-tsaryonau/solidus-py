@@ -43,6 +43,34 @@ def public_key_hex(secret_key: bytes) -> str:
     return _native.bbs_public_key_hex(secret_key)
 
 
+def generate_secret_key() -> bytes:
+    """Issuer side: a fresh random 32-byte BBS+ secret key.
+
+    Not ``os.urandom(32)``: not every 32-byte string is a valid scalar.
+
+    >>> sk = generate_secret_key()
+    >>> len(sk), len(public_key_hex(sk))
+    (32, 192)
+    """
+    return bytes(_native.bbs_generate_secret_key())
+
+
+def sign(secret_key: bytes, header: bytes, messages: Sequence[bytes]) -> str:
+    """Issuer side: sign the full message vector under ``header``, as hex.
+
+    Deterministic: the same key, header and messages give the same signature,
+    which is what lets the conformance vector pin it.
+
+    >>> sk = generate_secret_key()
+    >>> sig = sign(sk, b"hdr", [b"a", b"b"])
+    >>> verify(sig, public_key_hex(sk), b"hdr", [b"a", b"b"])
+    True
+    >>> verify(sig, public_key_hex(sk), b"hdr", [b"a", b"c"])
+    False
+    """
+    return _native.bbs_sign(secret_key, header, list(messages))
+
+
 def verify(
     signature_hex: str,
     public_key_hex_: str,
@@ -107,4 +135,11 @@ def verify_proof(
     )
 
 
-__all__ = ["public_key_hex", "verify", "create_proof", "verify_proof"]
+__all__ = [
+    "public_key_hex",
+    "generate_secret_key",
+    "sign",
+    "verify",
+    "create_proof",
+    "verify_proof",
+]

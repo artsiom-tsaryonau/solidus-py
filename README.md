@@ -15,11 +15,13 @@ nothing is tagged until that form is filled in.
 
 **Ships:** address and DID derivation · identifier validation (SPEC v0.2.0 §4.1) ·
 `publicKeyMultibase` encoding **and decoding** · strict Ed25519 verification · BBS+ signature
-verification and selective-disclosure proofs.
+verification and selective-disclosure proofs · BBS+ credential signing (`bbs.sign`,
+`bbs.generate_secret_key`) for an issuer you run yourself. BBS+ calls release the GIL, so a threaded
+server verifies in parallel.
 
 **Not in the first version:**
 
-- **Transaction signing.** A write path means key handling, and in Python that means people pasting
+- **Transaction signing** (chain writes; credential signing above is a different key and path). A write path means key handling, and in Python that means people pasting
   private keys into notebooks. The read path ships well first.
 - **DID resolution over the network.** The encoding and validation this package does are the parts
   implementations get wrong. An HTTP client is not.
@@ -33,27 +35,21 @@ Not yet. When it publishes:
 pip install solidus-network
 ```
 
-### Installing from source — read this before you try
+### Installing from source
 
-⚠ **A standalone clone of this repository cannot currently build the native module.** The BBS+
-binding depends on `solidus-crypto`, which is **not on crates.io**, so `Cargo.toml` carries a path
-that only resolves inside the Solidus monorepo. `pip install git+https://…` will fail at the Rust
-build.
+A standalone clone builds. The BBS+ module is vendored from `solidus-crypto` (`src/bbs.rs`, since
+`8dd39bd`), so the only requirement is a Rust toolchain:
 
-This is stated here rather than left for you to discover, and it is a real limitation, not a
-formality. Two things lift it, in this order:
+```bash
+git clone --recurse-submodules https://github.com/artsiom-tsaryonau/solidus-py
+cd solidus-py && python -m venv .venv && . .venv/bin/activate
+pip install maturin pytest && maturin develop --release
+SOLIDUS_REQUIRE_NATIVE=1 pytest      # the submodule carries the conformance vectors
+```
 
-1. **Publish `solidus-crypto` to crates.io**, so the dependency resolves for anyone.
-2. **A CI wheel matrix** (linux/macos/windows × cp39–cp314), so `pip install solidus-network` needs no
-   Rust toolchain at all. An sdist alone would force one on every user.
-
-Neither has happened yet. Until then this repository is readable, reviewable and runnable *inside*
-the monorepo — and the pure-Python half (derivation, DIDs, multibase, strict Ed25519) has no native
-dependency and works from a clone today.
-
-⚠ A git dependency on the public `protocol` repository would **not** fix this. That copy of
-`solidus-crypto` predates the feature gating, so `blst` is not optional there and building against
-it would drag a C BLS toolchain into every wheel — the exact cost the gating removed.
+`pip install git+https://github.com/artsiom-tsaryonau/solidus-py@<sha>` works the same way and
+compiles the extension on install. A wheel matrix is still what makes `pip install
+solidus-network` need no Rust at all.
 
 ## Usage
 

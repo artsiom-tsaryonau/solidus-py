@@ -9,7 +9,18 @@ Solidus is on **testnet only**. There is no mainnet release yet.
 
 ## [Unreleased]
 
+### Fixed
+
+- README no longer says a standalone clone cannot build; it has since the
+  vendored BBS+ module (`8dd39bd`).
+
 ### Added
+
+- `bbs.generate_secret_key()` and `bbs.sign()`: the issuer side of BBS+, so a
+  self-hosted issuer needs no TypeScript. Signing is checked byte for byte
+  against the `bbs-sign-verify` conformance vector.
+- BBS+ calls release the GIL (`py.detach`), so threaded servers verify in
+  parallel instead of serialising ~5 ms of pairing work per request.
 
 - `py.typed` and stubs for the Rust extension module, so type checkers see the
   package's annotations instead of treating it as untyped. The
